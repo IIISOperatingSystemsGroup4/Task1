@@ -420,6 +420,50 @@ public class KThread {
 	private int which;
     }
 
+    private static class Caller implements Runnable {
+		Caller(KThread callee, int val1, int val2) {
+			this.callee = callee;
+			this.val1 = val1;
+			this.val2 = val2;
+		}
+
+		public void run() {
+			System.out.println("Caller has started");
+			for(int i = 0; i < val1; i ++) {
+				System.out.println("Caller is doing stuff");
+				currentThread.yield();
+			}
+			System.out.println("Caller joins callee");
+			this.callee.join();
+			System.out.println("Caller has joined");
+			for(int i = 0; i < val2; i ++) {
+				System.out.println("Caller is doing more stuff");
+				currentThread.yield();
+			}
+			System.out.println("Caller has finished doing stuff");
+		}
+		
+		private KThread callee = null;
+		private int val1, val2;
+	}
+
+	private static class Callee implements Runnable {
+		Callee(int val) {
+			this.val = val;
+		}
+		
+		public void run() {
+			System.out.println("Callee is going to do stuff");
+			for(int i = 0; i < val; i ++) {
+				System.out.println("Callee is doing stuff");
+				currentThread.yield();
+			}
+			System.out.println("Callee has finished doing stuff");
+		}
+		
+		int val;
+	}
+
     /**
      * Tests whether this module is working.
      */
@@ -428,6 +472,22 @@ public class KThread {
 
 	new KThread(new PingTest(1)).setName("forked thread").fork();
 	new PingTest(0).run();
+	
+	KThread caller, callee;
+	
+	//Case 1: Join called on an already running thread, joining thread should wait
+	System.out.println("\tTestcase 1:");
+	callee = new KThread(new Callee(3));
+	callee.setName("Callee").fork();
+	new Caller(callee, 1, 1).run();
+	
+	//Case 2: Join called on an already terminated thread, joining thread should return immediately
+	System.out.println("\tTestcase 2:");
+	callee = new KThread(new Callee(1));
+	callee.setName("Callee").fork();
+	currentThread.yield();
+	currentThread.yield();
+	new Caller(callee, 1, 1).run();
     }
 
     private static final char dbgThread = 't';

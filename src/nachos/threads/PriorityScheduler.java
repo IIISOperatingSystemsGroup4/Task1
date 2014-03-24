@@ -152,7 +152,7 @@ public class PriorityScheduler extends Scheduler {
 				System.out.println(KThread.currentThread().getName());
 				for(int i = 0; i < 10; ++i) {
 					System.out.println(KThread.currentThread().getName() + " working " + i);	
-					if (i == 2) {
+					if (i == 5) {
 						System.out.println(KThread.currentThread().getName() + " changes priority from 5 to 7");
 						boolean int_state = Machine.interrupt().disable();
 						ThreadedKernel.scheduler.setPriority(7);
@@ -534,6 +534,7 @@ public class PriorityScheduler extends Scheduler {
 	 */
 	public void waitForAccess(PriorityQueue waitQueue) {
 	    // implement me
+		this.enqueueTime = Machine.timer().getTime();
 		waitQueue.waitingQueue.add(this);
 		waitingOn = waitQueue;
 		if (waitQueue.owner != null)
@@ -566,7 +567,11 @@ public class PriorityScheduler extends Scheduler {
 		if (thisPriority < statePriotity)
 			return 1;
 		else if (thisPriority > statePriotity) 
-			return -1;		
+			return -1;
+		else if (enqueueTime > state.enqueueTime)
+			return -1;
+		else if (enqueueTime > state.enqueueTime)
+			return 1;
 		return 0;
 	}
 
@@ -579,5 +584,6 @@ public class PriorityScheduler extends Scheduler {
 	protected LinkedList<PriorityQueue> donorQueue = new LinkedList<PriorityQueue>();
 	protected PriorityQueue waitingOn = null;
 	protected int effectivePriority = 0;
+	protected long enqueueTime;
     }
 }
