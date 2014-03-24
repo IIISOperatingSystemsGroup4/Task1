@@ -31,6 +31,11 @@ public class RoundRobinScheduler extends Scheduler {
     public ThreadQueue newThreadQueue(boolean transferPriority) {
 	return new FifoQueue();
     }
+    
+    //Task 1.5
+    public ThreadQueue newThreadQueue(boolean transferPriority, KThread thread) {
+    	return new FifoQueue();
+        }
 
     private class FifoQueue extends ThreadQueue {
 	/**

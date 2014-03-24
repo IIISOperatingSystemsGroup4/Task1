@@ -31,190 +31,243 @@ import java.util.LinkedList;
  * particular, priority must be donated through locks, and through joins.
  */
 public class PriorityScheduler extends Scheduler {
-    /**
-     * Allocate a new priority scheduler.
-     */
 	
-	public static void selfTestRun( KThread t1, int t1p, KThread t2, int t2p) {
+	/**
+	 * Generate a test with 3 running threads with given initial priority.
+	 */
+	public static void selfTestRun(KThread t1, int p1, KThread t2, int p2, KThread t3, int p3) {
 
-		boolean int_state;
-
-		int_state = Machine.interrupt().disable();
-		ThreadedKernel.scheduler.setPriority( t1, t1p );
-		ThreadedKernel.scheduler.setPriority( t2, t2p );
+		boolean int_state = Machine.interrupt().disable();
+		ThreadedKernel.scheduler.setPriority(t1, p1);
+		ThreadedKernel.scheduler.setPriority(t2, p2);
+		ThreadedKernel.scheduler.setPriority(t3, p3);
 		Machine.interrupt().restore( int_state );
-		
-		t1.setName("a").fork();
-		t2.setName("b").fork();
-		t1.join();
-		t2.join();
-	}
-	
-	public static void selfTestRun( KThread t1, int t1p, KThread t2, int t2p, KThread t3, int t3p ) {
-
-		boolean int_state;
-
-		int_state = Machine.interrupt().disable();
-		ThreadedKernel.scheduler.setPriority( t1, t1p );
-		ThreadedKernel.scheduler.setPriority( t2, t2p );
-		ThreadedKernel.scheduler.setPriority( t3, t3p );
-		Machine.interrupt().restore( int_state );
-		
-		t1.setName("a").fork();
-		t2.setName("b").fork();
-		t3.setName("c").fork();
+		t1.setName("Thread 1").fork();		
+		t2.setName("Thread 2").fork();		
+		t3.setName("Thread 3").fork();
 		t1.join();
 		t2.join();
 		t3.join();
 	}
+	
+	/**
+	 * Generate a test with 4 running threads with given initial priority.
+	 */
+	public static void selfTestRun(KThread t1, int p1, KThread t2, int p2, KThread t3, int p3, KThread t4, int p4) {
+
+		boolean int_state = Machine.interrupt().disable();
+		ThreadedKernel.scheduler.setPriority(t1, p1);
+		ThreadedKernel.scheduler.setPriority(t2, p2);
+		ThreadedKernel.scheduler.setPriority(t3, p3);
+		ThreadedKernel.scheduler.setPriority(t4, p4);
+		Machine.interrupt().restore( int_state );
+		t1.setName("Thread 1").fork();		
+		t2.setName("Thread 2").fork();		
+		t3.setName("Thread 3").fork();
+		t4.setName("Thread 4").fork();
+		t1.join();
+		t2.join();
+		t3.join();
+		t4.join();
+	}	
 
 	/**
-	 * Tests whether this module is working.
+	 * Tests whether the PriorityScheduler is working as expected.
 	 */
-	public static void selfTest() {
+	public void selfTest() {
 
 		KThread t1, t2, t3;
 		final Lock lock;
 		final Condition condition;
 
 		/*
-		 * Case 1: Tests priority scheduler without donation
-		 *
-		 * This runs t1 with priority 7, and t2 with priority 4.
+		 * Test 1: without donation and priority change
 		 *
 		 */
 
-		System.out.println( "Case 1:" );
+		System.out.println("Test 1");
 
 		t1 = new KThread(new Runnable() {
 				public void run() {
-					System.out.println( KThread.currentThread().getName() + " started working" );
-					for( int i = 0; i < 10; ++i ) {
-						System.out.println( KThread.currentThread().getName() + " working " + i );	
+					System.out.println(KThread.currentThread().getName());
+					for(int i = 0; i < 10; ++i) {
+						System.out.println(KThread.currentThread().getName() + " working " + i);	
 						KThread.yield();
 					}
-					System.out.println( KThread.currentThread().getName() + " finished working" );
+					System.out.println(KThread.currentThread().getName());
 				}
 			});
-
+		
 		t2 = new KThread(new Runnable() {
-				public void run() {
-					System.out.println( KThread.currentThread().getName() + " started working" );
-					for( int i = 0; i < 10; ++i ) {
-						System.out.println( KThread.currentThread().getName() + " working " + i );	
-						KThread.yield();
-					}
-					System.out.println( KThread.currentThread().getName() + " finished working" );
-				}
-
-			});
-
-		selfTestRun( t1, 7, t2, 4 );
-
-		/*
-		 * Case 2: Tests priority scheduler without donation, altering
-		 * priorities of threads after they've started running
-		 *
-		 * This runs t1 with priority 7, and t2 with priority 4, but
-		 * half-way through t1's process its priority is lowered to 2.
-		 *
-		 */
-
-		System.out.println( "Case 2:" );
-
-		t1 = new KThread(new Runnable() {
-				public void run() {
-					System.out.println( KThread.currentThread().getName() + " started working" );
-					for( int i = 0; i < 10; ++i ) {
-						System.out.println( KThread.currentThread().getName() + " working " + i );	
-						KThread.yield();
-						if( i == 4 ) {
-							System.out.println( KThread.currentThread().getName() + " reached 1/2 way, changing priority" );
-							boolean int_state = Machine.interrupt().disable();
-							ThreadedKernel.scheduler.setPriority( 2 );
-							Machine.interrupt().restore( int_state );
-						}
-					}
-					System.out.println( KThread.currentThread().getName() + " finished working" );
-				}
-			});
-
-		t2 = new KThread(new Runnable() {
-				public void run() {
-					System.out.println( KThread.currentThread().getName() + " started working" );
-					for( int i = 0; i < 10; ++i ) {
-						System.out.println( KThread.currentThread().getName() + " working " + i );	
-						KThread.yield();
-					}
-					System.out.println( KThread.currentThread().getName() + " finished working" );
-				}
-
-			});
-
-		selfTestRun( t1, 7, t2, 4 );
-
-		/*
-		 * Case 3: Tests priority donation
-		 *
-		 * This runs t1 with priority 7, t2 with priority 6 and t3 with
-		 * priority 4. t1 will wait on a lock, and while t2 would normally
-		 * then steal all available CPU, priority donation will ensure that
-		 * t3 is given control in order to help unlock t1.
-		 *
-		 */
-
-		System.out.println( "Case 3:" );
-
-		lock = new Lock();
-		condition = new Condition( lock );
-
-		t1 = new KThread(new Runnable() {
 			public void run() {
-				lock.acquire();
-				System.out.println( KThread.currentThread().getName() + " active" );
-				lock.release();
+				System.out.println(KThread.currentThread().getName());
+				for(int i = 0; i < 10; ++i) {
+					System.out.println(KThread.currentThread().getName() + " working " + i);	
+					KThread.yield();
+				}
+				System.out.println(KThread.currentThread().getName());
 			}
 		});
-
-		t2 = new KThread(new Runnable() {
-				public void run() {
-					for( int i = 0; i < 3; ++i ) {
-						System.out.println( KThread.currentThread().getName() + " working " + i );	
-						KThread.yield();
-					}
-					System.out.println( KThread.currentThread().getName() + " finished working" );
-				}
-
-			});
-
+		
 		t3 = new KThread(new Runnable() {
 			public void run() {
-				lock.acquire();
-
-				boolean int_state = Machine.interrupt().disable();
-				ThreadedKernel.scheduler.setPriority( 2 );
-				Machine.interrupt().restore( int_state );
-
-				KThread.yield();
-
-				// t1.acquire() will now have to realise that t3 owns the lock it wants to obtain
-				// so program execution will continue here.
-
-				System.out.println( KThread.currentThread().getName() + " active ('a' wants its lock back so we are here)" );
-				lock.release();
-				KThread.yield();
-				lock.acquire();
-				System.out.println( KThread.currentThread().getName() + " active-again (should be after 'a' and 'b' done)" );
-				lock.release();
-
+				System.out.println(KThread.currentThread().getName());
+				for(int i = 0; i < 10; ++i) {
+					System.out.println(KThread.currentThread().getName() + " working " + i);	
+					KThread.yield();
+				}
+				System.out.println(KThread.currentThread().getName());
 			}
 		});
 
-		selfTestRun( t1, 6, t2, 4, t3, 7 );
+		selfTestRun(t1, 6, t2, 5, t3, 4);
 
+		/*
+		 * Test 2: without donation but with priority change
+		 *
+		 */
+		
+		
+		System.out.println("Test 2");
+
+		t1 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println(KThread.currentThread().getName());
+				for(int i = 0; i < 10; ++i) {
+					System.out.println(KThread.currentThread().getName() + " working " + i);
+					if (i == 2) {
+						System.out.println(KThread.currentThread().getName() + " changes priority from 6 to 0");
+						boolean int_state = Machine.interrupt().disable();
+						ThreadedKernel.scheduler.setPriority(0);
+						Machine.interrupt().restore(int_state);
+					}
+					KThread.yield();
+				}
+				System.out.println(KThread.currentThread().getName());
+			}
+		});
+	
+		t2 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println(KThread.currentThread().getName());
+				for(int i = 0; i < 10; ++i) {
+					System.out.println(KThread.currentThread().getName() + " working " + i);	
+					if (i == 2) {
+						System.out.println(KThread.currentThread().getName() + " changes priority from 5 to 7");
+						boolean int_state = Machine.interrupt().disable();
+						ThreadedKernel.scheduler.setPriority(7);
+						Machine.interrupt().restore(int_state);
+					}
+					KThread.yield();
+				}
+				System.out.println(KThread.currentThread().getName());
+			}
+		});
+	
+		t3 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println(KThread.currentThread().getName());
+				for(int i = 0; i < 10; ++i) {
+					System.out.println(KThread.currentThread().getName() + " working " + i);
+					KThread.yield();
+				}
+				System.out.println(KThread.currentThread().getName());
+			}
+		});
+
+		selfTestRun(t1, 6, t2, 5, t3, 4);
+
+		/*
+		 * Test 3: with donation and priority change
+		 *
+		 */
+		
+		System.out.println("Test 3");
+
+		lock = new Lock();
+	//	final Lock lock2 = new Lock();
+		condition = new Condition( lock );
+	//	final Condition condition2 = new Condition(lock2);
+
+		final KThread t01 = new KThread(new Runnable() {
+			public void run() {
+		//		lock2.acquire();
+				KThread.yield();
+				KThread.yield();
+				System.out.println(KThread.currentThread().getName());
+				boolean int_state = Machine.interrupt().disable();
+				ThreadedKernel.scheduler.setPriority(1);
+				KThread a = KThread.currentThread();
+				System.out.println(getEffectivePriority(a));
+				Machine.interrupt().restore(int_state);
+				System.out.println(KThread.currentThread().getName());
+				KThread.yield();
+				int_state = Machine.interrupt().disable();
+				a = KThread.currentThread();
+				System.out.println(getEffectivePriority(a));
+				Machine.interrupt().restore(int_state);
+				System.out.println(KThread.currentThread().getName());
+				KThread.yield();
+				System.out.println(KThread.currentThread().getName());
+		//		lock2.release();
+			}
+		});
+
+		final KThread t02 = new KThread(new Runnable() {
+			public void run() {
+				KThread.yield();
+				KThread.yield();
+				System.out.println(KThread.currentThread().getName());
+				lock.acquire();
+				boolean int_state = Machine.interrupt().disable();
+				ThreadedKernel.scheduler.setPriority(2);
+				KThread a = KThread.currentThread();
+				System.out.println(getEffectivePriority(a));
+				Machine.interrupt().restore(int_state);
+				System.out.println(KThread.currentThread().getName());
+				KThread.yield();
+			//	lock2.acquire();
+				t01.join();
+				System.out.println(KThread.currentThread().getName());
+				lock.release();
+			//	lock2.release();
+				System.out.println(KThread.currentThread().getName());
+			}
+		});
+
+		final KThread t03 = new KThread(new Runnable() {
+			public void run() {
+				KThread.yield();
+				KThread.yield();
+				System.out.println(KThread.currentThread().getName());
+				lock.acquire();
+				System.out.println(KThread.currentThread().getName());
+			}
+		});
+		
+		final KThread t04 = new KThread(new Runnable() {
+			public void run() {
+				KThread.yield();
+				KThread.yield();
+				System.out.println(KThread.currentThread().getName());
+				System.out.println("t01:" + getThreadState(t01).effectivePriority);
+				System.out.println("t02:" + getThreadState(t02).effectivePriority);
+				System.out.println("t03:" + getThreadState(t03).effectivePriority);
+				System.out.println("t04:" + getThreadState(KThread.currentThread()).effectivePriority);
+				for( int i = 0; i < 2; ++i ) {
+					System.out.println( KThread.currentThread().getName() + " working " + i );	
+					KThread.yield();
+				}
+				System.out.println(KThread.currentThread().getName());
+			}
+		});
+
+		selfTestRun(t01, 7, t02, 6, t03, 5, t04, 4);
 	}
 
-	
+	/**
+     * Allocate a new priority scheduler.
+     */
     public PriorityScheduler() {
     }
 
@@ -229,6 +282,11 @@ public class PriorityScheduler extends Scheduler {
     public ThreadQueue newThreadQueue(boolean transferPriority) {
 	return new PriorityQueue(transferPriority);
     }
+    
+    //Task 1.5
+    public ThreadQueue newThreadQueue(boolean transferPriority, KThread thread) {
+    	return new PriorityQueue(transferPriority, thread);
+        }
 
     public int getPriority(KThread thread) {
 	Lib.assertTrue(Machine.interrupt().disabled());
@@ -314,6 +372,12 @@ public class PriorityScheduler extends Scheduler {
 	PriorityQueue(boolean transferPriority) {
 	    this.transferPriority = transferPriority;
 	}
+	
+	//Task 1.5
+	PriorityQueue(boolean transferPriority, KThread thread) {
+	    this.transferPriority = transferPriority;
+	    this.owner = getThreadState(thread);
+	}
 
 	public void waitForAccess(KThread thread) {
 	    Lib.assertTrue(Machine.interrupt().disabled());
@@ -370,7 +434,7 @@ public class PriorityScheduler extends Scheduler {
 	public boolean transferPriority;
 	
 	//Task 1.5
-	private ThreadState owner = null;
+	public ThreadState owner = null;
 	private java.util.PriorityQueue<ThreadState> waitingQueue = new java.util.PriorityQueue<ThreadState>();
     }
 
@@ -381,7 +445,7 @@ public class PriorityScheduler extends Scheduler {
      *
      * @see	nachos.threads.KThread#schedulingState
      */
-    protected class ThreadState  implements Comparable {
+    protected class ThreadState implements Comparable {
 	/**
 	 * Allocate a new <tt>ThreadState</tt> object and associate it with the
 	 * specified thread.
@@ -433,6 +497,7 @@ public class PriorityScheduler extends Scheduler {
 					if (t.effectivePriority > effectivePriority)
 						effectivePriority = t.effectivePriority;
 		PriorityQueue queue = (PriorityQueue) thread.joinQueue;
+		if (queue != null)
 		if (queue.transferPriority)
 			for (ThreadState t : queue.waitingQueue)
 				if (t.effectivePriority > effectivePriority)
@@ -496,9 +561,11 @@ public class PriorityScheduler extends Scheduler {
 	//Task 1.5
 	public int compareTo(Object t) {
 		ThreadState state = (ThreadState) t;
-		if (this.effectivePriority < state.effectivePriority)
+		int thisPriority = getEffectivePriority();//effectivePriority;//
+		int statePriotity = state.getEffectivePriority();//state.effectivePriority;//
+		if (thisPriority < statePriotity)
 			return 1;
-		else if (this.effectivePriority > state.effectivePriority) 
+		else if (thisPriority > statePriotity) 
 			return -1;		
 		return 0;
 	}

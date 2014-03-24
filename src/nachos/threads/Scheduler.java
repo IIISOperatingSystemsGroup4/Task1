@@ -53,6 +53,9 @@ public abstract class Scheduler {
      * @return	a new thread queue.
      */
     public abstract ThreadQueue newThreadQueue(boolean transferPriority);
+    
+    //Task 1.5
+    public abstract ThreadQueue newThreadQueue(boolean transferPriority, KThread thread);
 
     /**
      * Get the priority of the specified thread. Must be called with

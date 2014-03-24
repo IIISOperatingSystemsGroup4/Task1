@@ -51,8 +51,9 @@ public class ThreadedKernel extends Kernel {
 	KThread.selfTest();
 	Semaphore.selfTest();
 	SynchList.selfTest();
-	PriorityScheduler.selfTest();
     Communicator.selfTest();
+	PriorityScheduler a = new PriorityScheduler();
+	a.selfTest();
 	if (Machine.bank() != null) {
 	    ElevatorBank.selfTest();
 	}

@@ -160,7 +160,16 @@ public class KThread {
     private void runThread() {
 	begin();
 	target.run();
+	
+	//Task 1.1 & 1.5
+	boolean intStatus = Machine.interrupt().disable();
+
+	while (currentThread.joinQueue.nextThread() != null) {
+	}
 	joinSemaphore.V();
+
+	Machine.interrupt().restore(intStatus);		
+			
 	finish();
     }
 
@@ -196,7 +205,7 @@ public class KThread {
 
 
 	currentThread.status = statusFinished;
-
+	
 	sleep();
     }
 
@@ -281,17 +290,15 @@ public class KThread {
 	Lib.assertTrue(this != currentThread);
 	
 	// TASK 1.1
-			boolean intStatus = Machine.interrupt().disable();
+	boolean intStatus = Machine.interrupt().disable();
 
-			// so the current thread will wait for this thread
-			// not need to wait if the thread is already dead
-			if (status != statusFinished) {
-				joinQueue.waitForAccess(currentThread);
-				joinSemaphore.P();
-				joinSemaphore.V();
-			}
+	if (status != statusFinished) {
+		joinQueue.waitForAccess(currentThread);
+		joinSemaphore.P();
+		joinSemaphore.V();
+	}
 
-			Machine.interrupt().restore(intStatus);
+	Machine.interrupt().restore(intStatus);		
 
     }
 
@@ -462,7 +469,8 @@ public class KThread {
     private static KThread idleThread = null;
     
     
- //Task 1.1 & 1.5
- 	ThreadQueue joinQueue = ThreadedKernel.scheduler.newThreadQueue(true);
+    //Task 1.1 & 1.5
+ 	ThreadQueue joinQueue = ThreadedKernel.scheduler.newThreadQueue(true, this);
+    //PriorityScheduler.PriorityQueue joinQueue = new ThreadedKernel.PriorityScheduler.PriorityQueue(true);
     private Semaphore joinSemaphore = new Semaphore(0);
 }
