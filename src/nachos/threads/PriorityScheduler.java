@@ -561,8 +561,8 @@ public class PriorityScheduler extends Scheduler {
 	//Task 1.5
 	public int compareTo(Object t) {
 		ThreadState state = (ThreadState) t;
-		int thisPriority = getEffectivePriority();//effectivePriority;//
-		int statePriotity = state.getEffectivePriority();//state.effectivePriority;//
+		int thisPriority = effectivePriority;//getEffectivePriority();//
+		int statePriotity = state.effectivePriority;//state.getEffectivePriority();//
 		if (thisPriority < statePriotity)
 			return 1;
 		else if (thisPriority > statePriotity) 
