@@ -41,7 +41,7 @@ public class PriorityScheduler extends Scheduler {
 		ThreadedKernel.scheduler.setPriority(t1, p1);
 		ThreadedKernel.scheduler.setPriority(t2, p2);
 		ThreadedKernel.scheduler.setPriority(t3, p3);
-		Machine.interrupt().restore( int_state );
+		Machine.interrupt().restore(int_state);
 		t1.setName("Thread 1").fork();		
 		t2.setName("Thread 2").fork();		
 		t3.setName("Thread 3").fork();
@@ -60,7 +60,7 @@ public class PriorityScheduler extends Scheduler {
 		ThreadedKernel.scheduler.setPriority(t2, p2);
 		ThreadedKernel.scheduler.setPriority(t3, p3);
 		ThreadedKernel.scheduler.setPriority(t4, p4);
-		Machine.interrupt().restore( int_state );
+		Machine.interrupt().restore(int_state);
 		t1.setName("Thread 1").fork();		
 		t2.setName("Thread 2").fork();		
 		t3.setName("Thread 3").fork();
@@ -570,7 +570,7 @@ public class PriorityScheduler extends Scheduler {
 			return -1;
 		else if (enqueueTime > state.enqueueTime)
 			return -1;
-		else if (enqueueTime > state.enqueueTime)
+		else if (enqueueTime < state.enqueueTime)
 			return 1;
 		return 0;
 	}

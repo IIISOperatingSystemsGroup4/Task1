@@ -2,6 +2,8 @@
 //PART OF THE NACHOS. DON'T CHANGE CODE OF THIS LINE
 package nachos.threads;
 
+import java.util.TreeSet;
+
 import nachos.machine.*;
 
 /**
@@ -29,6 +31,20 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
+    	long nowTime = Machine.timer().getTime();
+    	boolean intStatus = Machine.interrupt().disable();
+    	while(!threads.isEmpty())
+    	{
+    		TThread t = threads.first();
+    		if(t.wakeTime <= nowTime)
+    		{
+    			t.thread.ready();
+    			threads.remove(t);
+    		}
+    		else
+    			break;
+    	}
+    	Machine.interrupt().restore(intStatus);
 	KThread.currentThread().yield();
     }
 
@@ -48,8 +64,82 @@ public class Alarm {
      */
     public void waitUntil(long x) {
 	// for now, cheat just to get something working (busy waiting is bad)
-	long wakeTime = Machine.timer().getTime() + x;
-	while (wakeTime > Machine.timer().getTime())
-	    KThread.yield();
+    long nowTime = Machine.timer().getTime();
+	long wakeTime = nowTime + x;
+	//while (wakeTime > Machine.timer().getTime())
+    //    KThread.yield();
+	
+	boolean intStatus = Machine.interrupt().disable();
+	threads.add(new TThread(KThread.currentThread(), wakeTime));
+	KThread.currentThread().sleep();
+	Machine.interrupt().restore(intStatus);
+    }
+    
+    public TreeSet<TThread> threads = new TreeSet<TThread>(); 
+    
+    public static void selfTest()
+    {
+    	Alarm alarm = new Alarm();
+    	KThread[] ts = new KThread[100];
+    	for(int i = 0; i < 100; i++)
+    		ts[i] = new KThread(alarm.new Test(alarm));
+    	for(int i = 0; i < 100; i++)
+    		ts[i].fork();
+    	for(int i = 0; i < 100; i++)
+    		ts[i].join();
+    	System.out.println("All threads are waken");
+    }
+    
+    
+    
+    
+    class TThread implements Comparable
+    {
+    	public KThread thread;
+    	long wakeTime;
+    	public TThread(KThread kthread, long wakeTime)
+    	{
+    		this.thread = kthread;
+    		this.wakeTime = wakeTime;
+    	}
+		@Override
+		public int compareTo(Object o) {
+			// TODO Auto-generated method stub
+			TThread oThread = (TThread) o;
+			if(this.wakeTime > oThread.wakeTime)
+				return 1;
+			else if(this.wakeTime < oThread.wakeTime)
+				return -1;
+			else
+				return this.thread.compareTo(oThread.thread);
+		}
+    	
+    }
+    
+    
+    
+    class Test implements Runnable
+    {
+
+		public Alarm alarm;
+		
+		public Test(Alarm alarm)
+		{
+			this.alarm = alarm;
+		}
+		public void run() {
+			// TODO Auto-generated method stub
+			long wait = (long)(Math.random()  * 10000);
+			long nowTime = Machine.timer().getTime();
+			
+			alarm.waitUntil(wait);
+			
+			long wakeTime = Machine.timer().getTime();
+			if(wakeTime - nowTime < wait)
+				System.out.println("Error!");
+			else
+				System.out.println(wait + " < " + (wakeTime - nowTime));
+		}
+    	
     }
 }
