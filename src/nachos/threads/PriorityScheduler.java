@@ -569,9 +569,9 @@ public class PriorityScheduler extends Scheduler {
 		else if (thisPriority > statePriotity) 
 			return -1;
 		else if (enqueueTime > state.enqueueTime)
-			return -1;
-		else if (enqueueTime < state.enqueueTime)
 			return 1;
+		else if (enqueueTime < state.enqueueTime)
+			return -1;
 		return 0;
 	}
 
