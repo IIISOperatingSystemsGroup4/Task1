@@ -103,6 +103,8 @@ public class SynchConsole {
     private SerialConsole console;
     private Lock readLock = new Lock();
     private Lock writeLock = new Lock();
+    private Lock blockWriteLock=new Lock();
+//    private Lock blockReadLock=new Lock();
     private Semaphore readWait = new Semaphore(0);
     private Semaphore writeWait = new Semaphore(0);
 
@@ -121,7 +123,7 @@ public class SynchConsole {
 	public int read(byte[] buf, int offset, int length) {
 	    if (!canRead)
 		return 0;
-
+//	    blockReadLock.acquire();
 	    int i;
 	    for (i=0; i<length; i++) {
 		int value = SynchConsole.this.readByte(false);
@@ -129,6 +131,7 @@ public class SynchConsole {
 		    break;
 
 		buf[offset+i] = (byte) value;
+//		blockReadLock.release();
 	    }
 
 	    return i;
@@ -137,10 +140,10 @@ public class SynchConsole {
 	public int write(byte[] buf, int offset, int length) {
 	    if (!canWrite)
 		return 0;
-
+	    blockWriteLock.acquire();
 	    for (int i=0; i<length; i++)
 		SynchConsole.this.writeByte(buf[offset+i]);
-
+	    blockWriteLock.release();
 	    return length;
 	}
 

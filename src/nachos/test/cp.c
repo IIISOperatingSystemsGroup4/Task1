@@ -8,32 +8,24 @@ char buf[BUFSIZE];
 
 int main(int argc, char** argv)
 {
-  int src, dst, amount;
+  int fd, amount;
 
-  if (argc!=3) {
-    printf("Usage: cp <src> <dst>\n");
+  if (argc!=2) {
+    printf("Usage: cat <file>\n");
     return 1;
   }
 
-  src = open(argv[1]);
-  if (src==-1) {
+  fd = open(argv[1]);
+  if (fd==-1) {
     printf("Unable to open %s\n", argv[1]);
     return 1;
   }
 
-  creat(argv[2]);
-  dst = open(argv[2]);
-  if (dst==-1) {
-    printf("Unable to create %s\n", argv[2]);
-    return 1;
+  while ((amount = read(fd, buf, BUFSIZE))>0) {
+    write(1, buf, amount);
   }
 
-  while ((amount = read(src, buf, BUFSIZE))>0) {
-    write(dst, buf, amount);
-  }
-
-  close(src);
-  close(dst);
+  close(fd);
 
   return 0;
 }

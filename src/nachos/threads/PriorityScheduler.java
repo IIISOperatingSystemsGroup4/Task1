@@ -136,9 +136,9 @@ public class PriorityScheduler extends Scheduler {
 				for(int i = 0; i < 10; ++i) {
 					System.out.println(KThread.currentThread().getName() + " working " + i);
 					if (i == 2) {
-						System.out.println(KThread.currentThread().getName() + " changes priority from 6 to 0");
+						System.out.println(KThread.currentThread().getName() + " changes priority from 6 to 1");
 						boolean int_state = Machine.interrupt().disable();
-						ThreadedKernel.scheduler.setPriority(0);
+						ThreadedKernel.scheduler.setPriority(1);
 						Machine.interrupt().restore(int_state);
 					}
 					KThread.yield();
@@ -435,7 +435,7 @@ public class PriorityScheduler extends Scheduler {
 	
 	//Task 1.5
 	public ThreadState owner = null;
-	private java.util.PriorityQueue<ThreadState> waitingQueue = new java.util.PriorityQueue<ThreadState>();
+	public java.util.PriorityQueue<ThreadState> waitingQueue = new java.util.PriorityQueue<ThreadState>();
     }
 
     /**
@@ -538,7 +538,7 @@ public class PriorityScheduler extends Scheduler {
 		waitQueue.waitingQueue.add(this);
 		waitingOn = waitQueue;
 		if (waitQueue.owner != null)
-			waitQueue.owner.getEffectivePriority();
+			getThreadState(waitQueue.owner.thread).getEffectivePriority();
 	}
 
 	/**
@@ -576,14 +576,14 @@ public class PriorityScheduler extends Scheduler {
 	}
 
 	/** The thread with which this object is associated. */
-	protected KThread thread;
+	public KThread thread;
 	/** The priority of the associated thread. */
-	protected int priority;
+	public int priority;
 	
 	//Task 1.5
-	protected LinkedList<PriorityQueue> donorQueue = new LinkedList<PriorityQueue>();
-	protected PriorityQueue waitingOn = null;
-	protected int effectivePriority = 0;
-	protected long enqueueTime;
+	public LinkedList<PriorityQueue> donorQueue = new LinkedList<PriorityQueue>();
+	public PriorityQueue waitingOn = null;
+	public int effectivePriority = 0;
+	public long enqueueTime;
     }
 }
