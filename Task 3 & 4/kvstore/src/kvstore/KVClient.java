@@ -10,14 +10,14 @@ import java.io.IOException;
  */
 public class KVClient implements KeyValueInterface {
 
-    private String server = null;
+	private String server = null;
     private int port = 0;
 
     /**
      * Constructs a KVClient connected to a server.
      *
      * @param server is the DNS reference to the server
-     * @param port is the port on which the server is listening
+     * @param port is the port on which the server is listening 
      */
     public KVClient(String server, int port) {
         this.server = server;
@@ -35,7 +35,8 @@ public class KVClient implements KeyValueInterface {
     	Socket socket = null;
     	try {
 			socket = new Socket(server, port);
-		} catch (IOException ex) {
+		}
+    	catch (IOException ex) {
     		throw new KVException(KVConstants.ERROR_COULD_NOT_CONNECT);
     	}
     	catch (Exception ex) {
@@ -68,39 +69,27 @@ public class KVClient implements KeyValueInterface {
     @Override
     public void put(String key, String value) throws KVException {
         // implement me
-    	
     	if (key == null || key.length() == 0)
         	throw new KVException(KVConstants.ERROR_INVALID_KEY);
         if (value == null || value.length() == 0)
         	throw new KVException(KVConstants.ERROR_INVALID_VALUE);
-        
-    	Socket socket = null;
-		KVMessage message = null;
-		KVMessage response = null;
-
-		try {
-			socket = connectHost();
-			message = new KVMessage("putreq");
-			message.setKey(key);
-			message.setValue(value);
-			message.sendMessage(socket);
-			
-			response = new KVMessage(socket);
-			closeHost(socket);
-		} catch (Exception e) {
-			throw new KVException(new KVMessage("resp", "Unknown Error: " + e.getMessage()));
-		}
-
-		if (! response.getMsgType().equals("resp")) {
-			throw new KVException(new KVMessage("resp", "Uknown Error: Recieved a message not of type 'resp' from server"));
-		}
-
-		if (! response.getMessage().equals("Success")) {
+    	
+    	Socket socket = connectHost();
+    	KVMessage message = new KVMessage("putreq");
+    	message.setKey(key);
+    	message.setValue(value);
+    	message.sendMessage(socket);
+    	
+    	KVMessage response = new KVMessage(socket);
+    	closeHost(socket);
+    	
+    	if (! response.getMessage().equals("Success")) {
 			throw new KVException(response);
 		}
-
-		return;
-    }
+    	
+    	return;
+    	
+    	}
 
     /**
      * Issues a GET request to the server.
@@ -111,45 +100,23 @@ public class KVClient implements KeyValueInterface {
      */
     @Override
     public String get(String key) throws KVException {
-        // implement me
-    	
-    	 if (key == null || key.length() == 0)
-         	throw new KVException(KVConstants.ERROR_INVALID_KEY);
-    	 
-    	Socket socket = null;
-		KVMessage message = null;
-		KVMessage response = null;
-
-		try {
-			// Connect to server
-			socket = connectHost();
-
-			// Initialize KVMessage of type getreq
-			message = new KVMessage("getreq");
-
-			// Set key and send message to server via socket
-			message.setKey(key);
-			message.sendMessage(socket);
-
-			// Get the response from the server
-			response = new KVMessage(socket);
-			closeHost(socket);
-		} catch (Exception e) {
-			throw new KVException(new KVMessage("resp", "Unknown Error: " + e.getMessage()));
-		}
-
-		// If we don't recieve a KVMessage of type "resp" throw unknown error
-		if (! response.getMsgType().equals("resp")) {
-			throw new KVException(new KVMessage("resp", "Unknown Error: Recieved a message not of type 'resp' from server"));
-		}
-
-		// If KVMessage response doesn't have a value of type String, throw KVException with response
-		if ( response.getValue() == null) {
+    	// implement me
+    	if (key == null || key.length() == 0)
+        	throw new KVException(KVConstants.ERROR_INVALID_KEY);
+        
+    	Socket socket = connectHost();
+        KVMessage message = new KVMessage("getreq");;
+        message.setKey(key);
+        message.sendMessage(socket);
+        
+        KVMessage response = new KVMessage(socket);
+        closeHost(socket);
+        
+        if ( response.getValue() == null) {
 			throw new KVException(response);
-		} 
-
-		return response.getValue();
-
+		}
+        
+        return response.getValue();
     }
 
     /**
@@ -160,45 +127,22 @@ public class KVClient implements KeyValueInterface {
      */
     @Override
     public void del(String key) throws KVException {
-        // implement me
+    	// implement me
     	if (key == null || key.length() == 0)
         	throw new KVException(KVConstants.ERROR_INVALID_KEY);
     	
-    	Socket socket = null;
-		KVMessage message = null;
-		KVMessage response = null;
-
-		try {
-			// Connect to server
-			socket = connectHost();
-
-			// Initialize a KVMessage of type delreq
-			message = new KVMessage("delreq");
-
-			// Set key and value then send message
-			message.setKey(key);
-			message.sendMessage(socket);
-
-			// Get response from server
-			response = new KVMessage(socket);
-			closeHost(socket);
-		} catch (Exception e) {
-			throw new KVException(new KVMessage("resp", "Unknown Error: " + e.getMessage()));
-		}
-
-		// If we don't recieve a KVMessage of type "resp" throw unknown error
-		if (! response.getMsgType().equals("resp")) {
-			throw new KVException(new KVMessage("resp", "Uknown Error: Recieved a message not of type 'resp' from server"));
-		}
-
-		// If KVMessage response isn't successful, throw KVException with response
-		if (! response.getMessage().equals("Success")) {
+    	Socket socket = connectHost();
+    	KVMessage message = new KVMessage("delreq");
+    	message.setKey(key);
+    	message.sendMessage(socket);
+    	KVMessage response = new KVMessage(socket);
+    	closeHost(socket);
+    	
+    	if (! response.getMessage().equals("Success")) {
 			throw new KVException(response);
-		} 
-
-		return;
-
+		}
+    	
+    	return;
     }
-
-
+    
 }

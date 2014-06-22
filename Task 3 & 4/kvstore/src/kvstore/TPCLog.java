@@ -107,6 +107,31 @@ public class TPCLog {
      */
     public void rebuildServer() throws KVException {
         // implement me
+    	loadFromDisk();
+    	KVMessage lastValidMove=null;
+    	for (int i=0;i<entries.size();i++) {
+    		KVMessage thisMove=entries.get(i);
+    		System.out.println("MsgType="+thisMove.getMsgType());
+    		String msgType=thisMove.getMsgType();
+    		if (msgType.equals("put")||msgType.equals("del")) {
+    			lastValidMove=thisMove;
+    		}
+    		if (msgType.equals("commit")&&(lastValidMove!=null)) {
+    			String lastMsgType=lastValidMove.getMsgType();
+    			if (lastMsgType.equals("put")) {
+    				kvServer.put(lastValidMove.getKey(), lastValidMove.getValue());
+    				System.out.println("Put something.");
+    			}
+    			if (lastMsgType.equals("del")) {
+    				kvServer.del(lastValidMove.getKey());
+    				System.out.println("Del something.");
+    			}
+    			lastValidMove=null;
+    		}
+    		if (msgType.equals("abort")) 
+    			lastValidMove=null;
+    		
+    	}
     }
 
 }

@@ -4,6 +4,7 @@ import static kvstore.KVConstants.*;
 
 import java.io.*;
 import java.net.*;
+import java.util.Scanner;
 
 import javax.xml.parsers.*;
 import javax.xml.transform.OutputKeys;
@@ -22,6 +23,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+
 /**
  * This is the object that is used to generate the XML based messages
  * for communication between clients and servers.
@@ -32,7 +34,7 @@ public class KVMessage implements Serializable {
     private String key;
     private String value;
     private String message;
-
+//    private Lock lock=new Lock
     public static final long serialVersionUID = 6473128480951955693L;
 
     /**
@@ -79,7 +81,10 @@ public class KVMessage implements Serializable {
      */
     private boolean verify(String type)
     {
-    	return (type.equals("putreq")||type.equals("getreq")||type.equals("delreq")||type.equals("resp"));
+    	return (type.equals("commit")||type.equals("abort")||
+    			type.equals("ready")||type.equals("putreq")||
+    			type.equals("getreq")||type.equals("delreq")||
+    			type.equals("resp")||type.equals("ack")||type.equals("register"));
     }
     public KVMessage(Socket sock, int timeout) throws KVException {
         // implement me
@@ -88,9 +93,8 @@ public class KVMessage implements Serializable {
     		NoCloseInputStream input=new NoCloseInputStream(sock.getInputStream());
     		DocumentBuilderFactory fac=DocumentBuilderFactory.newInstance();
     		DocumentBuilder db=fac.newDocumentBuilder();
-    		System.out.println("just before parse:");
+    		while (input.available()==0);
     		Document doc=db.parse(input);
-    		System.out.println("Parse finished.");
     		NodeList list=doc.getElementsByTagName("KVMessage");
     		if (list.getLength()!=1)
     			throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
@@ -129,13 +133,32 @@ public class KVMessage implements Serializable {
         				throw new KVException(new KVMessage("resp","Data Error: Null or empty key"));
         			if ((value==null)||(value.equals("")))
         				throw new KVException(new KVMessage("resp","Data Error: Null or empty value"));
-  			}
+    			}
     			else if ((valNodeList.getLength()==0)&&(keyNodeList.getLength()==0)&&(msgNodeList.getLength()==1)) {//other resp
     				message=msgNodeList.item(0).getTextContent();
     			}
     			else
     				throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
     		}
+    		if (type.equals("abort")) {
+    			if ((valNodeList.getLength()>0)||(keyNodeList.getLength()>0)) 
+    				throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
+    			if (msgNodeList.getLength()>1)
+    				throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
+    			message=msgNodeList.item(0).getTextContent();
+    		}
+    		if (type.equals("register")) {
+    			if ((valNodeList.getLength()>0)||(keyNodeList.getLength()>0)) 
+    				throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
+    			if (msgNodeList.getLength()!=1)
+    				throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
+    			message=msgNodeList.item(0).getTextContent();    			
+    		}
+    		if (type.equals("ack")||type.equals("commit")||type.equals("ready")) {
+    			if ((valNodeList.getLength()>0)||(keyNodeList.getLength()>0)||(msgNodeList.getLength()>0)) 
+    				throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
+    		}
+        		
     	}
     	catch(SocketTimeoutException e) {
     		System.out.println("SocketException");
@@ -191,6 +214,8 @@ public class KVMessage implements Serializable {
     		Element root=doc.createElement("KVMessage");
     		root.setAttribute("type",msgType);
     		doc.appendChild(root);
+    		if (!verify(msgType)) 
+    			throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
     		if (msgType.equals("getreq")||msgType.equals("delreq")||msgType.equals("putreq")) {
     			if ((key==null)||(key.equals("")))
         			throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
@@ -219,6 +244,28 @@ public class KVMessage implements Serializable {
         			root.appendChild(valElement);
     			}
     			else if ((key==null)&&(value==null)&&(message!=null)) {
+        			Element msgElement=doc.createElement("Message");
+        			msgElement.appendChild(doc.createTextNode(message));
+        			root.appendChild(msgElement);
+    			}
+    			else
+    				throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));	
+    		}
+    		if (msgType.equals("abort")) {
+    			if ((key!=null)||(value!=null))
+        			throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
+    			else if (message!=null) {
+        			Element msgElement=doc.createElement("Message");
+        			msgElement.appendChild(doc.createTextNode(message));
+        			root.appendChild(msgElement);    				
+    			}
+    		}
+    		if (msgType.equals("ack")||msgType.equals("commit")||msgType.equals("ready")) {
+    			if ((key!=null)||(value!=null)||(message!=null))
+        			throw new KVException(new KVMessage("resp","XML Error: Message format incorrect"));
+    		}
+    		if (msgType.equals("register")) {
+    			if ((key==null)&&(value==null)&&(message!=null)) {
         			Element msgElement=doc.createElement("Message");
         			msgElement.appendChild(doc.createTextNode(message));
         			root.appendChild(msgElement);
@@ -260,7 +307,6 @@ public class KVMessage implements Serializable {
     		OutputStream output=sock.getOutputStream();
         	output.write(toWrite.getBytes("UTF-8"));
         	output.flush();
-        	System.out.println("here:"+toXML());
         	sock.shutdownOutput();
        	}
     	catch(IOException e) {

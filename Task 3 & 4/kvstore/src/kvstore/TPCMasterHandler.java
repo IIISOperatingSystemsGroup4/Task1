@@ -2,7 +2,9 @@ package kvstore;
 
 import static kvstore.KVConstants.*;
 
+import java.io.IOException;
 import java.net.Socket;
+import java.net.UnknownHostException;
 /**
  * Implements NetworkHandler to handle 2PC operation requests from the Master/
  * Coordinator Server
@@ -24,7 +26,8 @@ public class TPCMasterHandler implements NetworkHandler {
     public TPCMasterHandler(long slaveID, KVServer kvServer, TPCLog log) {
         this(slaveID, kvServer, log, 1);
     }
-
+    
+  
     /**
      * Constructs a TPCMasterHandler with a variable number of connections
      * in its ThreadPool
@@ -56,6 +59,18 @@ public class TPCMasterHandler implements NetworkHandler {
     public void registerWithMaster(String masterHostname, SocketServer server)
             throws KVException {
         // implement me
+    	Socket master = null;
+		try {
+			master = new Socket(masterHostname, 9090);
+			KVMessage regMessage = new KVMessage("register", slaveID + "@" + server.getHostname() 
+					+ ":" + server.getPort());
+			regMessage.sendMessage(master);
+			master.close();
+		} catch (UnknownHostException e) {
+			// ignore
+		} catch (IOException e) {
+			// ignore
+		}
     }
 
     /**
@@ -67,6 +82,12 @@ public class TPCMasterHandler implements NetworkHandler {
     @Override
     public void handle(Socket master) {
         // implement me
+    	MasterHandler handler = new MasterHandler(master);
+    	try {
+			threadpool.addJob(handler);
+		} catch (InterruptedException e) {
+			// ignore
+		}
     }
 
     /**
@@ -94,6 +115,63 @@ public class TPCMasterHandler implements NetworkHandler {
         @Override
         public void run() {
             // implement me
+        	try {
+        		KVMessage prepareOrDecision = new KVMessage(master);
+        		KVMessage responseOrAck = new KVMessage(READY);
+        		
+        		switch(prepareOrDecision.getMsgType()) {
+        			// phase 1
+        			case PUT_REQ:
+        				// key size no larger than 256, value size no larger than 256*1024
+        				if (prepareOrDecision.getKey().length() > 256)
+        					responseOrAck = new KVMessage(ABORT, ERROR_OVERSIZED_KEY);
+        				if (prepareOrDecision.getValue().length() > 256 * 1024)
+        					responseOrAck = new KVMessage(ABORT, ERROR_OVERSIZED_VALUE);
+        				break;
+        			case DEL_REQ:
+        			    break;
+        			case GET_REQ:
+        				try {
+        					responseOrAck = new KVMessage(RESP);
+        					responseOrAck.setKey(prepareOrDecision.getKey());
+							responseOrAck.setValue(kvServer.get(prepareOrDecision.getKey()));
+        				} catch (KVException e) {
+							responseOrAck = new KVMessage(ABORT, e.getKVMessage().getMessage());
+        				}
+        				break;
+        				
+        			// phase 2
+        			case COMMIT:
+        				responseOrAck = new KVMessage(ACK);
+        				KVMessage prepare = tpcLog.getLastEntry();
+						switch(prepare.getMsgType()) {
+							case PUT_REQ:
+								kvServer.put(prepare.getKey(), prepare.getValue());
+								break;
+							case DEL_REQ:
+								kvServer.del(prepare.getKey());
+								break;
+							default:
+								break;
+						}
+					case ABORT:
+						responseOrAck = new KVMessage(ACK);
+						break;
+					
+					// wrong format
+					default:
+						throw new KVException(ERROR_INVALID_FORMAT);
+        		}
+        		tpcLog.appendAndFlush(prepareOrDecision);
+        		responseOrAck.sendMessage(master);
+		
+        	} catch (KVException e) {
+		    	try {
+					e.getKVMessage().sendMessage(master);
+				} catch (KVException e1) {
+					// ignore
+				}
+        	}		
         }
 
     }
