@@ -39,9 +39,6 @@ public class KVClient implements KeyValueInterface {
     	catch (IOException ex) {
     		throw new KVException(KVConstants.ERROR_COULD_NOT_CONNECT);
     	}
-    	catch (Exception ex) {
-    		throw new KVException(KVConstants.ERROR_COULD_NOT_CREATE_SOCKET);
-    	}
         return socket;
     }
 

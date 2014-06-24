@@ -56,6 +56,14 @@ public class KVMessage implements Serializable {
     	this.msgType = msgType;
         this.message = message;
     }
+    
+    private boolean verify(String type)
+    {
+        return (type.equals("commit")||type.equals("abort")||
+                type.equals("ready")||type.equals("putreq")||
+                type.equals("getreq")||type.equals("delreq")||
+                type.equals("resp")||type.equals("ack")||type.equals("register"));
+    }
 
     /**
      * Construct KVMessage from the InputStream of a socket.
@@ -65,8 +73,9 @@ public class KVMessage implements Serializable {
      * @throws KVException if we fail to create a valid KVMessage. Please see
      *         KVConstants.java for possible KVException messages.
      */
+    @SuppressWarnings("resource")
     public KVMessage(Socket sock) throws KVException {
-        this(sock, 0);
+        this(sock, KVConstants.TIMEOUT_MILLISECONDS);
     }
 
     /**
@@ -79,13 +88,7 @@ public class KVMessage implements Serializable {
      * @throws KVException if we fail to create a valid KVMessage. Please see
      *         KVConstants.java for possible KVException messages.
      */
-    private boolean verify(String type)
-    {
-    	return (type.equals("commit")||type.equals("abort")||
-    			type.equals("ready")||type.equals("putreq")||
-    			type.equals("getreq")||type.equals("delreq")||
-    			type.equals("resp")||type.equals("ack")||type.equals("register"));
-    }
+    @SuppressWarnings("resource")
     public KVMessage(Socket sock, int timeout) throws KVException {
         // implement me
     	try {
@@ -93,7 +96,12 @@ public class KVMessage implements Serializable {
     		NoCloseInputStream input=new NoCloseInputStream(sock.getInputStream());
     		DocumentBuilderFactory fac=DocumentBuilderFactory.newInstance();
     		DocumentBuilder db=fac.newDocumentBuilder();
-    		while (input.available()==0);
+    		long time = System.currentTimeMillis();
+    		while (input.available()==0) {
+    		    if (System.currentTimeMillis() - time > sock.getSoTimeout()) {
+    		        throw new SocketTimeoutException();
+    		    }
+    		}
     		Document doc=db.parse(input);
     		NodeList list=doc.getElementsByTagName("KVMessage");
     		if (list.getLength()!=1)

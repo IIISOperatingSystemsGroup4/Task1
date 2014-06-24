@@ -4,6 +4,7 @@ import static kvstore.KVConstants.*;
 
 import java.net.Socket;
 import java.util.*;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -13,9 +14,11 @@ public class TPCMaster {
     private KVCache masterCache;
     ArrayList<TPCSlaveInfo> ts;
     public SocketServer slaveServer;
-//    public TPCMaster self;
+    volatile private KVMessage error;
+
     
     Lock lock;
+    Condition cv; 
 
     public static final int TIMEOUT = 3000;
 
@@ -32,26 +35,12 @@ public class TPCMaster {
         ts = new ArrayList<TPCSlaveInfo>();
         slaveServer = new SocketServer("localhost", 9090);
         lock = new ReentrantLock();
-//        (new Thread(new RegisterThread())).start();
-//        self = this;
+        cv = lock.newCondition();
+ 
     }
     
-    /*
-    public class RegisterThread implements Runnable
-    {
-    	public void run()
-    	{
-    		TPCClientHandler handler = new TPCClientHandler(self, numSlaves);
-    		slaveServer.addHandler(handler);
-    		try
-    		{
-    			slaveServer.connect();
-    			slaveServer.start();
-    		}
-    		catch(Exception e)
-    		{}
-    	}
-    }*/
+    
+
 
     /**
      * Registers a slave. Drop registration request if numSlaves already
@@ -62,8 +51,9 @@ public class TPCMaster {
      */
     public void registerSlave(TPCSlaveInfo slave) {
         // implement me
-    	lock.lock();
     	{
+    		lock.lock();
+    		try{
     		int p = -1;
     		boolean exist = false;
     		for(int i = 0; i < ts.size(); i++)
@@ -101,8 +91,14 @@ public class TPCMaster {
     			}
 
     		}
+    		if(ts.size() == numSlaves)
+    			cv.signalAll();
+    		}
+    		finally{		
+    			lock.unlock();
+    		}
+    		
     	}
-    	lock.unlock();
     	
     }
 
@@ -154,12 +150,27 @@ public class TPCMaster {
      */
     public TPCSlaveInfo findFirstReplica(String key) {
         // implement me
-    	for(int i = 0; i < ts.size(); i++)
-    	{
-    		if(isLessThanEqualUnsigned(hashTo64bit(key),ts.get(i).getSlaveID()))
-    			return ts.get(i);
+    	lock.lock();
+    	if(ts.size() < numSlaves)
+			{
+    			try {
+    				cv.await();
+    			} catch (InterruptedException e) {
+    				e.printStackTrace();
+    			}
+			}
+    	try{
+    		for(int i = 0; i < ts.size(); i++)
+    		{
+    			if(isLessThanEqualUnsigned(hashTo64bit(key),ts.get(i).getSlaveID()))
+    				return ts.get(i);
+    		}
+    		return ts.get(0);
     	}
-    	return ts.get(0);
+    	finally
+    	{
+    		lock.unlock();
+    	}
     }
 
     /**
@@ -195,34 +206,34 @@ public class TPCMaster {
         String key = msg.getKey();
         Lock lock = masterCache.getLock(key);
         lock.lock();
+        error = null;
         try {
-            TPCSlaveInfo firstReplica = findFirstReplica(key);
-            TPCSlaveInfo secondReplica = findSuccessor(firstReplica);
-            String[] error = new String[1];
-            error[0] = null;
-            Thread threadPhase1_0 = new Thread(new RunnablePhase1(
-                    firstReplica, msg, error));
-            Thread threadPhase1_1 = new Thread(new RunnablePhase1(
-                    secondReplica, msg, error));
+            Thread threadPhase1_0 = new Thread(
+                    new RunnablePhase1(key, true, msg));
+            Thread threadPhase1_1 = new Thread(
+                    new RunnablePhase1(key, false, msg));
             threadPhase1_0.start();
             threadPhase1_1.start();
             try {
                 threadPhase1_0.join();
                 threadPhase1_1.join();
-            } catch (InterruptedException e) {}
-            
-            Thread threadPhase2_0 = new Thread(new RunnablePhase2(
-                    key, true, error[0] == null, error));
-            Thread threadPhase2_1 = new Thread(new RunnablePhase2(
-                    key, false, error[0] == null, error));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            Thread threadPhase2_0 = new Thread(
+                    new RunnablePhase2(key, true, error == null));
+            Thread threadPhase2_1 = new Thread(
+                    new RunnablePhase2(key, false, error == null));
             threadPhase2_0.start();
             threadPhase2_1.start();
             try {
                 threadPhase2_0.join();
                 threadPhase2_1.join();
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             
-            if (error[0] != null) throw new KVException(error[0]);
+            if (error != null) throw new KVException(error);
             if (isPutReq) masterCache.put(key, msg.getValue());
             else masterCache.del(key);
         } finally {
@@ -252,23 +263,36 @@ public class TPCMaster {
         try {
             String result = masterCache.get(key);
             if (result != null) return result;
-            TPCSlaveInfo firstReplica = findFirstReplica(key);
-            TPCSlaveInfo secondReplica = findSuccessor(firstReplica);
+            TPCSlaveInfo firstReplica;
+            TPCSlaveInfo secondReplica;
             String value = null, message = null;
             KVMessage response = null;
+            Socket sock = null;
+            while (true) {
+                try {
+                    firstReplica = findFirstReplica(key);
+                    sock = firstReplica.connectHost(TIMEOUT);
+                    break;
+                } catch (KVException e) {}
+            }
             try {
-                Socket sock = firstReplica.connectHost(TIMEOUT);
                 msg.sendMessage(sock);
-                response = new KVMessage(sock);
+                response = new KVMessage(sock, TIMEOUT);
                 firstReplica.closeHost(sock);
                 message = response.getMessage();
                 if (message == null) 
                     value = response.getValue();
             } catch (KVException e) {}
             if (value == null) {
-                Socket sock = secondReplica.connectHost(TIMEOUT);
+                while (true) {
+                    try {
+                        secondReplica = findSuccessor(findFirstReplica(key));
+                        sock = secondReplica.connectHost(TIMEOUT);
+                        break;
+                    } catch (KVException e) {}
+                }
                 msg.sendMessage(sock);
-                response = new KVMessage(sock);
+                response = new KVMessage(sock, TIMEOUT);
                 secondReplica.closeHost(sock);
                 message = response.getMessage();
                 if (message == null) 
@@ -281,31 +305,40 @@ public class TPCMaster {
             lock.unlock();
         }
     }
-    
+
     private class RunnablePhase1 implements Runnable {
         
-        private TPCSlaveInfo slaveInfo;
+        private String key;
+        private boolean isPrimarySlave;
         private KVMessage msg;
-        private String[] error;
         
         public RunnablePhase1(
-                TPCSlaveInfo slaveInfo, KVMessage msg, String[] error) {
+                String key, boolean isPrimarySlave, KVMessage msg) {
             super();
-            this.slaveInfo = slaveInfo;
+            this.key = key;
+            this.isPrimarySlave = isPrimarySlave;
             this.msg = msg;
-            this.error = error;
         }
         
         public void run() {
+            TPCSlaveInfo slaveInfo;
+            Socket sock = null;
+            while (true) {
+                slaveInfo = isPrimarySlave ? findFirstReplica(key) : 
+                    findSuccessor(findFirstReplica(key));
+                try {
+                    sock = slaveInfo.connectHost(TIMEOUT);
+                    break;
+                } catch (KVException e) {}
+            }
             try {
-                Socket sock = slaveInfo.connectHost(TIMEOUT);
                 msg.sendMessage(sock);
-                KVMessage response = new KVMessage(sock);
+                KVMessage response = new KVMessage(sock, TIMEOUT);
                 slaveInfo.closeHost(sock);
                 if (response.getMsgType().equals(ABORT)) 
                     throw new KVException(response);
             } catch (KVException e) {
-                error[0] = e.getMessage();
+                error = e.getKVMessage();
             }
         }
         
@@ -316,32 +349,36 @@ public class TPCMaster {
         private String key;
         private boolean isPrimarySlave;
         private boolean isCommit;
-        private String[] error; 
         
         public RunnablePhase2(String key, 
-                boolean isPrimarySlave, boolean isCommit, String[] error) {
+                boolean isPrimarySlave, boolean isCommit) {
             super();
             this.key = key;
             this.isPrimarySlave = isPrimarySlave;
             this.isCommit = isCommit;
-            this.error = error;
         }
         
         public void run() {
-            KVMessage response, msg = isCommit ? 
-                    new KVMessage(COMMIT) : new KVMessage(ABORT);
+            KVMessage response, msg = isCommit ? new KVMessage(COMMIT) : 
+                new KVMessage(ABORT, error.getMessage());
             TPCSlaveInfo slaveInfo;
+            Socket sock = null;
             while (true) {
                 slaveInfo = isPrimarySlave ? findFirstReplica(key) : 
                     findSuccessor(findFirstReplica(key));
                 try {
-                    Socket sock = slaveInfo.connectHost(TIMEOUT);
+                    sock = slaveInfo.connectHost(TIMEOUT);
                     msg.sendMessage(sock);
-                    response = new KVMessage(sock);
+                    response = new KVMessage(sock, TIMEOUT);
                     slaveInfo.closeHost(sock);
                     if (response.getMsgType().equals(ACK)) return;
+                    else if (response.getMsgType().equals(RESP)) {
+                        error = new KVMessage(RESP, response.getMessage());
+                        return;
+                    }
                     else {
-                        error[0] = ERROR_INVALID_FORMAT;
+                        error = new KVMessage(RESP, ERROR_INVALID_FORMAT);
+                        return;
                     }
                 } catch (KVException e) {}
             }

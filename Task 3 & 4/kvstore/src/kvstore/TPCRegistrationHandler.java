@@ -78,7 +78,7 @@ public class TPCRegistrationHandler implements NetworkHandler {
         	try{
         		regMsg = new KVMessage(slave);
         		if (!regMsg.getMsgType().equals("register")){
-        			ackMsg = new KVMessage(ERROR_INVALID_FORMAT);
+        			ackMsg = new KVMessage(RESP, ERROR_INVALID_FORMAT);
         			ackMsg.sendMessage(slave);
         			return;
         		}

@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
+import static kvstore.KVConstants.*;
 
 public class TPCLog {
 
@@ -110,25 +111,25 @@ public class TPCLog {
     	loadFromDisk();
     	KVMessage lastValidMove=null;
     	for (int i=0;i<entries.size();i++) {
-    		KVMessage thisMove=entries.get(i);
-    		System.out.println("MsgType="+thisMove.getMsgType());
+    		KVMessage thisMove = entries.get(i);
+    		//System.out.println("MsgType="+thisMove.getMsgType());
     		String msgType=thisMove.getMsgType();
-    		if (msgType.equals("put")||msgType.equals("del")) {
+    		if (msgType.equals(PUT_REQ)||msgType.equals(DEL_REQ)) {
     			lastValidMove=thisMove;
     		}
-    		if (msgType.equals("commit")&&(lastValidMove!=null)) {
+    		if (msgType.equals(COMMIT)&&(lastValidMove!=null)) {
     			String lastMsgType=lastValidMove.getMsgType();
-    			if (lastMsgType.equals("put")) {
+    			if (lastMsgType.equals(PUT_REQ)) {
     				kvServer.put(lastValidMove.getKey(), lastValidMove.getValue());
-    				System.out.println("Put something.");
+    				//System.out.println("Put something.");
     			}
-    			if (lastMsgType.equals("del")) {
+    			if (lastMsgType.equals(DEL_REQ)) {
     				kvServer.del(lastValidMove.getKey());
-    				System.out.println("Del something.");
+    				//System.out.println("Del something.");
     			}
     			lastValidMove=null;
     		}
-    		if (msgType.equals("abort")) 
+    		if (msgType.equals(ABORT)) 
     			lastValidMove=null;
     		
     	}
